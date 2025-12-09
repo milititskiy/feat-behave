@@ -1,0 +1,21 @@
+# PyPI Configuration Template
+# Copy this file to your home directory as .pypirc
+# Location: C:\Users\YOUR_USERNAME\.pypirc (Windows)
+#           ~/.pypirc (Linux/Mac)
+
+[distutils]
+index-servers =
+    pypi
+    testpypi
+
+[pypi]
+username = __token__
+password = pypi-YOUR_PYPI_TOKEN_HERE
+
+[testpypi]
+username = __token__
+password = pypi-YOUR_TESTPYPI_TOKEN_HERE
+
+# How to get tokens:
+# PyPI: https://pypi.org/manage/account/token/
+# TestPyPI: https://test.pypi.org/manage/account/token/
