@@ -59,12 +59,12 @@ eval "$(register-python-argcomplete auto-behave)"
 
 ```bash
 # Run a feature file (auto-detects directory from VS Code active tab)
-auto-behave my_feature.feature
+feat my_feature.feature
 ```
 
 ### With Tab Completion
 
-1. Type `auto-behave ` (with a space)
+1. Type `feat ` 
 2. Press `Tab` to see available feature files
 3. Start typing the file name and press `Tab` again to auto-complete
 
@@ -90,7 +90,7 @@ auto-behave my_feature.feature -d /path/to/features
 
 ## How It Works
 
-1. **Detects Active File**: When you run `auto-behave`, it tries to detect which file is currently active in VS Code
+1. **Detects Active File**: When you run `feat`, it tries to detect which file is currently active in VS Code
 2. **Finds Directory**: It extracts the directory path of the active file
 3. **Changes Directory**: Automatically `cd`s to that directory
 4. **Runs Behave**: Executes `behave feature_file.feature` in that directory
