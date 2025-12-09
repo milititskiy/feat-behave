@@ -6,7 +6,7 @@ Run behave feature files directly from VS Code's active tab with intelligent aut
 
 ✨ **Automatic Directory Detection** - Detects the active file in VS Code and runs behave from that directory  
 ⚡ **Tab Completion** - Auto-complete feature file names by pressing Tab  
-🎯 **Simple Command** - Just type `auto-behave feature_file.feature`  
+🎯 **Simple Command** - Just type `feat feature_file.feature`  
 🔄 **Fallback Support** - Uses current directory if VS Code detection fails  
 
 ## Installation
