@@ -187,6 +187,51 @@ python -m twine upload dist/*
 pip install feat-behave
 ```
 
+## macOS / Linux (zsh/bash) commands
+
+If you're on macOS or Linux with `zsh` or `bash`, use these commands (replace Windows PowerShell examples above):
+
+```bash
+# Install build tools
+python -m pip install --upgrade build twine
+
+# Clean previous builds
+rm -rf dist build *.egg-info
+
+# Build the package
+python -m build
+
+# Test upload to TestPyPI (recommended)
+python -m twine upload --repository testpypi dist/*
+
+# Production upload to PyPI
+python -m twine upload dist/*
+```
+
+## CI: Publish from GitHub Actions
+
+You can automate releases by creating a Git tag and pushing it to GitHub. The included workflow at `.github/workflows/publish.yml` listens for tags named like `v1.2.3` and will build and upload the `dist/` artifacts to PyPI.
+
+Steps:
+
+- Create a PyPI API token at https://pypi.org/manage/account/token/ and copy it.
+- In your GitHub repo, go to `Settings -> Secrets -> Actions` and add a secret named `PYPI_API_TOKEN` with the token value.
+- Locally, create a tag and push it:
+
+```bash
+# Update version in setup.py
+git add setup.py
+git commit -m "Bump version to v1.2.3"
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+The workflow will run and publish the package to PyPI using the token stored in `PYPI_API_TOKEN`.
+
+Notes:
+- The workflow uses `TWINE_USERNAME=__token__` and `TWINE_PASSWORD` from `secrets.PYPI_API_TOKEN`.
+- Make sure the `name` and `version` in `setup.py` are correct and unique on PyPI.
+
 ## 🔗 Useful Links
 
 - **PyPI**: https://pypi.org/

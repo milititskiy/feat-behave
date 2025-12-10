@@ -15,17 +15,31 @@ def get_active_file_from_vscode():
     """
     try:
         # Try to get the active file using VS Code CLI
-        # The 'code' command with --status shows VS Code's state
-        subprocess.run(
+        # The 'code' command with --status prints state info we can parse
+        result = subprocess.run(
             ['code', '--status'],
             capture_output=True,
             text=True,
             timeout=5
         )
-        
-        # Parse the output to find active file info
-        # This is a fallback approach
-        
+
+        if result.stdout:
+            import re
+            # Look for file:// URLs or absolute paths in the output
+            # Examples: file:///Users/you/project/file.feature or /Users/you/project/file.feature
+            patterns = [r'file://[^\s\)\]\']+\.feature', r'(/[^\s\)\]\']+\.feature)']
+            for pat in patterns:
+                m = re.search(pat, result.stdout)
+                if m:
+                    path = m.group(0)
+                    # strip file:// if present
+                    if path.startswith('file://'):
+                        from urllib.parse import unquote, urlparse
+                        parsed = urlparse(path)
+                        path = unquote(parsed.path)
+
+                    if os.path.exists(path):
+                        return path
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
         pass
     
@@ -65,48 +79,66 @@ def get_active_file_from_state(vscode_data_dir):
     try:
         # Look for workspace storage
         workspace_storage = vscode_data_dir / 'workspaceStorage'
-        
+
         if not workspace_storage.exists():
             return None
-        
-        # Get all workspace folders sorted by modification time
-        # (most recent first)
+
+        # Get workspace folders sorted by modification time (most recent first)
         workspace_dirs = sorted(
             workspace_storage.iterdir(),
             key=lambda x: x.stat().st_mtime,
             reverse=True
         )
-        
-        # Check the most recent workspace
-        for ws_dir in workspace_dirs[:5]:  # Check top 5 most recent workspaces
-            state_file = ws_dir / 'state.vscdb'
-            if state_file.exists():
-                # Try to read and parse the state file
-                # This is a SQLite database, but we can try reading it as text
-                try:
-                    with open(state_file, 'r', encoding='utf-8',
-                              errors='ignore') as f:
-                        content = f.read()
-                        # Look for file paths in the content
-                        # This is a heuristic approach
-                        if 'activeEditor' in content or 'editors' in content:
-                            # Try to extract file paths
-                            import re
-                            # Look for .feature files mentioned in the state
-                            pattern = (r'([a-zA-Z]:[/\\]' +
-                                       r'[^"\'<>|?*\n]+\.feature)')
-                            feature_files = re.findall(pattern, content)
-                            if feature_files:
-                                # Return the first valid feature file found
-                                for file_path in feature_files:
-                                    if os.path.exists(file_path):
-                                        return file_path
-                except Exception:
-                    continue
-    
+
+        import re
+        # Patterns to capture Windows paths, Unix paths, and file:// URIs
+        patterns = [
+            r'([A-Za-z]:[/\\][^"\'<>|?*\n]+\.feature)',
+            r'(/[^"\'<>|?*\n]+\.feature)',
+            r'file://[^\s\)\]\']+\.feature'
+        ]
+
+        # Check the most recent workspaces and scan files within for traces
+        for ws_dir in workspace_dirs[:10]:  # widen search to top 10
+            # Walk files in the workspace storage directory (non-recursive depth-limited)
+            try:
+                for p in ws_dir.rglob('*'):
+                    if p.is_file():
+                        try:
+                            # Read as binary and decode with latin1 to preserve bytes
+                            with open(p, 'rb') as f:
+                                raw = f.read()
+                                try:
+                                    text = raw.decode('utf-8', errors='ignore')
+                                except Exception:
+                                    text = raw.decode('latin1', errors='ignore')
+
+                                for pat in patterns:
+                                    matches = re.findall(pat, text)
+                                    if matches:
+                                        # matches may be tuples if groups used
+                                        for m in matches:
+                                            candidate = m if isinstance(m, str) else (m[0] if m else None)
+                                            if not candidate:
+                                                continue
+                                            # strip file:// if present
+                                            if candidate.startswith('file://'):
+                                                from urllib.parse import unquote, urlparse
+                                                parsed = urlparse(candidate)
+                                                candidate = unquote(parsed.path)
+
+                                            # Normalize tilde and such
+                                            candidate = os.path.expanduser(candidate)
+                                            if os.path.exists(candidate):
+                                                return candidate
+                        except Exception:
+                            continue
+            except Exception:
+                continue
+
     except Exception:
         pass
-    
+
     return None
 
 

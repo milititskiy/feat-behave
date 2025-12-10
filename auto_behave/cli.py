@@ -68,13 +68,14 @@ def run_behave(feature_file, base_directory, extra_args=None):
         print(f"🧪 Running: behave {feature_file}")
         print("-" * 60)
         
-        # Build the behave command
-        cmd = ['behave', feature_file]
+        # Build the behave command using the current Python executable
+        # This avoids relying on an external `behave` script on PATH
+        cmd = [sys.executable, '-m', 'behave', feature_file]
         if extra_args:
             cmd.extend(extra_args)
-        
-        # Run behave
-        result = subprocess.run(cmd, shell=True)
+
+        # Run behave (do not use shell=True with a list)
+        result = subprocess.run(cmd)
         
         return result.returncode
         
@@ -101,6 +102,7 @@ def main():
     
     parser.add_argument(
         'feature_file',
+        nargs='?',
         help='Name of the feature file to run (supports tab completion)'
     ).completer = FeatureFileCompleter()
     
@@ -120,6 +122,32 @@ def main():
     argcomplete.autocomplete(parser)
     
     args = parser.parse_args()
+
+    # If no feature file provided, and an active VS Code feature file exists,
+    # suggest running it interactively.
+    if not args.feature_file:
+        active_file = get_active_file_from_vscode()
+        if active_file and active_file.lower().endswith('.feature'):
+            active_basename = os.path.basename(active_file)
+            prompt = f"Detected active feature in VS Code: {active_file}\nRun '{active_basename}' now? [Y/n]: "
+            try:
+                choice = input(prompt).strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                print('\nNo response; aborting.')
+                return 1
+
+            if choice in ('', 'y', 'yes'):
+                args.feature_file = active_basename
+                # Set base directory to the active file's directory
+                args.directory = os.path.dirname(active_file)
+                print(f"📁 Using directory: {args.directory}")
+            else:
+                print('Aborted by user.')
+                return 0
+        else:
+            # No active feature; require a filename
+            parser.print_help()
+            return 1
     
     # Determine the base directory
     if args.directory:
@@ -143,19 +171,33 @@ def main():
     if not os.path.exists(base_dir):
         print(f"❌ Error: Directory does not exist: {base_dir}")
         return 1
-    
-    # Check if feature file exists
+    # Check if feature file exists in the detected base directory
     feature_path = os.path.join(base_dir, args.feature_file)
     if not os.path.exists(feature_path):
-        print(f"❌ Error: Feature file not found: {feature_path}")
-        print(f"\nAvailable feature files in {base_dir}:")
-        feature_files = find_feature_files(base_dir)
-        if feature_files:
-            for f in feature_files[:10]:  # Show first 10
-                print(f"  - {f}")
-        else:
-            print("  (none found)")
-        return 1
+        # Fallback: try to find the feature file anywhere in the repository
+        try:
+            from pathlib import Path
+            repo_root = Path(__file__).resolve().parents[1]
+            matches = list(repo_root.rglob(args.feature_file))
+            if matches:
+                found = matches[0]
+                found_dir = str(found.parent)
+                print(f"🔎 Found '{args.feature_file}' in different directory: {found_dir}")
+                base_dir = found_dir
+                feature_path = os.path.join(base_dir, args.feature_file)
+            else:
+                print(f"❌ Error: Feature file not found: {feature_path}")
+                print(f"\nAvailable feature files in {base_dir}:")
+                feature_files = find_feature_files(base_dir)
+                if feature_files:
+                    for f in feature_files[:10]:  # Show first 10
+                        print(f"  - {f}")
+                else:
+                    print("  (none found)")
+                return 1
+        except Exception:
+            print(f"❌ Error: Feature file not found: {feature_path}")
+            return 1
     
     # Run behave
     return run_behave(args.feature_file, base_dir, args.extra_args)
